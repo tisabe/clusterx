@@ -7,7 +7,6 @@ import json
 import math
 import numpy as np
 import scipy
-from copy import deepcopy
 import time
 import datetime
 
@@ -139,7 +138,6 @@ def compute_thermodynamic_averages(temperatures, energy, log_cdos, filename=None
         p = np.zeros(len(e))
         u = 0
         u2 = 0
-        z = 0
 
         # Compute canonical probability as
         # P(E) = 1 / \sum_Ep exp(ln(Ep)-ln(E)-\beta * (Ep-E))
@@ -561,7 +559,6 @@ class WangLandau():
         nitsampling = 1,
         nproc = 0
     ):
-        import sys
         emean = None
         scale = None
         if prob_dist == "gaussian":
@@ -625,8 +622,8 @@ class WangLandau():
 
     def _wls_init_from_file(self, cd, update_method, flatness_conditions, f_range):
         cdos = []
-        for l,eb in enumerate(cd._energy_bins):
-            cdos.append([eb,cd._cdos[l],0])
+        for ell,eb in enumerate(cd._energy_bins):
+            cdos.append([eb,cd._cdos[ell],0])
         cdos = np.asarray(cdos)
 
         # Update f
@@ -683,8 +680,6 @@ class WangLandau():
         emin = energies[0]
         emax = energies[-1] + energy_bin_width
 
-        is_outside_interval = False
-        
         if e < emin:
             return  None, True
         elif e >= emax:
@@ -841,9 +836,7 @@ class WangLandau():
         
         """
         import math
-        from clusterx.utils import poppush
-        import sys
-        
+
         self._em.corrc.reset_mc(mc = True)
         
         struc = self._wls_create_initial_structure(
@@ -959,7 +952,7 @@ class WangLandau():
         niter_per_sweep = 100000
         nonzero_bins_thresh = 5
 
-        print(f"Building flat histogram.")
+        print("Building flat histogram.")
         print(f" {'Mod. factor':12s} | {'MIN':8s} | {'AVG':10s} | {'Flatness':8s} | {'Tgt. Flat.':11s} |  {'No. of Bins':12s} | {'N iter.':15s} |  {'emin':11s} |  {'emax':11s} ")
         while (hist_min < histogram_flatness*hist_avg) or (n_nonzero_bins < nonzero_bins_thresh):
             print(f" {f:12.9f} | {int(hist_min):8d} | {hist_avg:10.2f} | {hist_min/hist_avg:8.3f} | {histogram_flatness:11.3f} |  {n_nonzero_bins:12d} | {niter:15d} | {cdos[0,0]:11.3f} | {cdos[-1,0]:11.3f}")
@@ -1351,7 +1344,6 @@ class ConfigurationalDensityOfStates():
             p = np.zeros(len(e))
             u = 0
             u2 = 0
-            z = 0
 
             # Compute canonical probability as
             # P(E) = 1 / \sum_Ep exp(ln(Ep)-ln(E)-\beta * (Ep-E))
