@@ -2,7 +2,12 @@
 # This work is licensed under the terms of the Apache 2.0 license
 # See accompanying license for details or visit https://www.apache.org/licenses/LICENSE-2.0.txt.
 
+import math
+
 from ase.spacegroup import crystal
+from ase.data import atomic_numbers as cn
+import numpy as np
+
 from clusterx.parent_lattice import ParentLattice
 from clusterx.super_cell import SuperCell
 from clusterx.clusters.clusters_pool import ClustersPool
@@ -11,9 +16,6 @@ from clusterx.correlations import CorrelationsCalculator
 from clusterx.model import Model
 from clusterx.thermodynamics.wang_landau import WangLandau
 
-from ase.data import atomic_numbers as cn
-import numpy as np
-import math
 
 def test_wanglandau():
 
@@ -95,10 +97,19 @@ def test_wanglandau():
         ensemble='canonical',
         nsubs=nsubs
     )
-    e0_unitcell=-77652.707924876348
-    e0=float(e0_unitcell)
-    e1=e0+0.5
-    cdos = wl.wang_landau_sampling(energy_range=[e0,e1], energy_bin_width=0.002, f_range=[math.exp(1), 2], update_method='square_root', flatness_conditions=[[0.1,math.exp(1e-1)]])
+    delta_e = 0.5
+    e0 = -77652.707924876348
+    e1 = e0 + delta_e
+    energy_bin_width = 0.002
+    print("Number of bins: ", delta_e/energy_bin_width)
+    # TODO: Test serialization with temporary file
+    cdos = wl.wang_landau_sampling(
+        energy_range=[e0,e1],
+        energy_bin_width=energy_bin_width,
+        f_range=[math.exp(1), 2],
+        update_method='square_root',
+        flatness_conditions=[[0.1,math.exp(1e-1)]]
+    )
 
     #x=cdos._cdos
     #energy_bins = []

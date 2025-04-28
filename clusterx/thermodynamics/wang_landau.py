@@ -2,13 +2,28 @@
 # This work is licensed under the terms of the Apache 2.0 license
 # See accompanying license for details or visit https://www.apache.org/licenses/LICENSE-2.0.txt.
 
-from clusterx.structure import Structure
+
 import json
 import math
-import numpy as np
-import scipy
 import time
 import datetime
+import sys
+
+import numpy as np
+from scipy.stats import norm
+from scipy import interpolate
+from scipy.special import gammaln
+from ase.units import kB as kb
+from ase.atoms import Atoms
+import matplotlib.pyplot as plt
+
+from clusterx.parent_lattice import ParentLattice
+from clusterx.structure import Structure
+from clusterx.super_cell import SuperCell
+from clusterx.visualization import _wls_normalize_histogram_for_plotting
+from clusterx.thermodynamics.monte_carlo import NumpyEncoder
+from clusterx.utils import isclose, dict_compare
+
 
 def microcanonical_temperature(e, ln_g):
     """Compute microcanonical temperature
@@ -27,8 +42,6 @@ def microcanonical_temperature(e, ln_g):
     ``ln_g``: array of float
         natural logarithm of the configurational density of states. 
     """
-    from ase.units import kB as kb
-
     grad = np.gradient(ln_g,e)
     temp = map( lambda x: 1/(kb*x), grad)
 
@@ -56,8 +69,7 @@ def cdos_interpolation(
     ``show_plot``: boolean
         whether to plot the interpolated CDOS
     """
-    from scipy import interpolate
-    from ase.units import kB as kb
+    
 
     e = energy
     log_g = log_cdos    
@@ -69,7 +81,6 @@ def cdos_interpolation(
     log_g_itpl -= log_g_itpl[0]
     
     if show_plot:
-        import matplotlib.pyplot as plt
 
         if plot_temperature is None:
             plt.plot(e_itpl, log_g_itpl, label="CDOS(itpl)")
@@ -124,8 +135,6 @@ def compute_thermodynamic_averages(temperatures, energy, log_cdos, filename=None
         Natural logarithm of the CDOS for the given energies in ``energy`` array.
 
     """
-    from ase.units import kB as kb
-    import sys
     ln_maxfloat = math.log(sys.float_info.max)
     e = energy
     log_g = log_cdos
@@ -357,7 +366,6 @@ def merge_windows(filepaths = [], wliteration = -1, e_factor = 1, show_plot=Fals
 
     energy_unique *= e_factor
 
-    from ase.units import kB as kb
     log_boltzmann = np.zeros(len(energy))
     log_boltzmann_unique = np.zeros(len(energy_unique))
     if plot_temperature is not None:
@@ -365,8 +373,6 @@ def merge_windows(filepaths = [], wliteration = -1, e_factor = 1, show_plot=Fals
         log_boltzmann_unique = np.array(energy_unique)/(kb*plot_temperature)
 
     if filename is not None:
-        from ase.units import kB as kb
-
         for i in range(n_cdos):
             for e, g in zip(cdoss[i]["sampling_info"]["energy_bins"], cdoss[i][wl_itrn[i]]["cdos"]):
                 energy_windows.append(e)
@@ -405,8 +411,6 @@ def merge_windows(filepaths = [], wliteration = -1, e_factor = 1, show_plot=Fals
         )
 
     if show_plot:
-        import matplotlib.pyplot as plt
-
         plt.scatter(np.array(energy) * e_factor, np.array(log_g) - log_boltzmann, label='All data')
         plt.scatter(energy_unique, log_g_unique - log_boltzmann_unique, label='Merged data')
 
@@ -532,7 +536,6 @@ class WangLandau():
             self._sublattice_indices = sublattice_indices
 
         if not self._sublattice_indices:
-            import sys
             sys.exit('Indices of sublattice are not correctly assigned, look at the documatation.')
         self._predict_swap = predict_swap
 
@@ -562,7 +565,7 @@ class WangLandau():
         emean = None
         scale = None
         if prob_dist == "gaussian":
-            from scipy.stats import norm
+            
             
             emean = (emax+emin)/2.0
             scale = emax - emin
@@ -631,7 +634,6 @@ class WangLandau():
             f = math.sqrt(cd._f)
             cd._update_method = update_method
         else:
-            import sys
             sys.exit('Different update method for f requested. Please see documentation')
 
         if f_range[1] < cd._f_range[1]:
@@ -693,14 +695,11 @@ class WangLandau():
         if update_method == 'square_root':
             f = math.sqrt(f)
         else:
-            import sys
             sys.exit('Different update method for f requested. Please see documentation')
         return f
 
     
     def _plot_hist(self, figure, ax, cdos, energy_bin_width):
-        from clusterx.visualization import _wls_normalize_histogram_for_plotting
-
         ener_arr = cdos[:,0].copy()
         cdos_arr = _wls_normalize_histogram_for_plotting(cdos[:,1], shift_y_first_nonzero=True)
         hist_arr = _wls_normalize_histogram_for_plotting(cdos[:,2])
@@ -835,8 +834,6 @@ class WangLandau():
             from the previous outer loops.
         
         """
-        import math
-
         self._em.corrc.reset_mc(mc = True)
         
         struc = self._wls_create_initial_structure(
@@ -886,7 +883,6 @@ class WangLandau():
         
 
         if plot_hist_real_time:
-            import matplotlib.pyplot as plt
             plt.ion()
             figure, ax = plt.subplots(figsize=(10, 8))
 
@@ -1193,7 +1189,6 @@ class ConfigurationalDensityOfStates():
             modification_factor = self._stored_cdos[-1]['modification_factor']
             ln_g = self._cdos.copy()
         else:
-            from clusterx.utils import isclose
             for gj,ln_gstored in enumerate(self._stored_cdos):
                 if isclose(modification_factor,ln_gstored['modification_factor'],rtol = 1.0e-8):
                     ln_g = ln_gstored['cdos'].copy()
@@ -1228,7 +1223,7 @@ class ConfigurationalDensityOfStates():
                         nsubs = self._nsubs[str(sublattice)][0] # [8]
                         nsites = nsites_dict[sublattice] # 16
                         # ln[binom(m,n)] = ln[Gamma(m+1)]-ln[Gamma(n+1)]-ln[Gamma(m-n+1)]
-                        ln_binomcoeff += scipy.special.gammaln(nsites+1)-scipy.special.gammaln(nsubs+1)-scipy.special.gammaln(nsites-nsubs+1)
+                        ln_binomcoeff += gammaln(nsites+1)-gammaln(nsubs+1)-gammaln(nsites-nsubs+1)
                         
                     ln_norm_factor = ln_binomcoeff - ln_g0 - ln_gsum
 
@@ -1327,8 +1322,6 @@ class ConfigurationalDensityOfStates():
             If not **None**, the CDOS corresponding to the given modification factor is used.
 
         """
-        from ase.units import kB as kb
-        import sys
         ln_maxfloat = math.log(sys.float_info.max)
         e, log_g = self.get_cdos(ln = True, normalization = True, discard_empty_bins = True,  modification_factor = modification_factor)
         thermoprop = np.zeros(len(temperatures))
@@ -1385,7 +1378,6 @@ class ConfigurationalDensityOfStates():
                 thermoprop[i] = (u-f)/t_i
                 
             else:
-                import sys
                 sys.exit("Thermodynamic property name ``prop_name`` not correctly defined. See Documentation.")
         return thermoprop
                 
@@ -1427,8 +1419,6 @@ class ConfigurationalDensityOfStates():
         for j,st_c_dos in enumerate(self._stored_cdos):
             cdosdict.update({str(j):st_c_dos})
 
-        from clusterx.thermodynamics.monte_carlo import NumpyEncoder
-        
         with open(self._filename, 'w+', encoding='utf-8') as outfile:
             json.dump(cdosdict, outfile, cls=NumpyEncoder, indent = 2 , separators = (',',':'))
 
@@ -1463,9 +1453,6 @@ class ConfigurationalDensityOfStates():
 
             superdict = cdos_info.pop('super_cell_definition',None)
             if self._scell is None:
-                from ase.atoms import Atoms
-                from clusterx.parent_lattice import ParentLattice
-                from clusterx.super_cell import SuperCell
                 if superdict is not None:
                     nsp = sorted([int(el) for el in set(superdict['parent_lattice']['numbers'])])
                     species = []
@@ -1486,10 +1473,8 @@ class ConfigurationalDensityOfStates():
                 self._scell = SuperCell(_plat, np.asarray(superdict['tmat']))
             else:
                 _sdict = self._scell.as_dict()
-                from clusterx.utils import dict_compare
                 _testc = dict_compare(_sdict,superdict)
                 if not _testc:
-                    import sys
                     sys.exit('SuperCell object given in the initialization is not equivalent to the SuperCell object stored in read file.')
             self._keyword_arguments = cdos_info
 
